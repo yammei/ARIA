@@ -92,8 +92,6 @@ def evaluate_model(actual, forecast, timeframe, metrics_path="../logs/ARIMAX_met
 
     return comparison_df
 
-
-
 # Save model and scaler
 def save_model(model, scaler, feature_names, model_file="sarimax_model.pkl", scaler_file="scaler.pkl", features_file="features.pkl"):
     file_path_prefix = '../model/'
@@ -107,7 +105,7 @@ def save_model(model, scaler, feature_names, model_file="sarimax_model.pkl", sca
 # Main workflow
 def main():
     forecasting = True
-    timeframes = [1, 2, 3, 6, 12]
+    timeframes = [3]
     for timeframe in timeframes:
         # Load tickers from correlation CSV
         correlation_csv_path = '../logs/CORRELATION_top_comovement.csv'
