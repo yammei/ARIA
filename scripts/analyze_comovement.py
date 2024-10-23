@@ -1,22 +1,48 @@
 import yfinance as yf
 import pandas as pd
 
-def get_sp500_tickers():
-    url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-    table = pd.read_html(url)
-    sp500_df = table[0]
-    return sp500_df['Symbol'].to_list()
+# Predefined list of cybersecurity and software companies
+cybersec_software_tickers = [
+    "PANW", "CRWD", "ZS", "FTNT", "CHKP", "CSCO", "AVGO", "IBM", "MSFT",  # Cybersecurity & Enterprise Software
+    "SNPS", "CDNS", "ADBE", "NOW", "ORCL",                                # Major Software Companies
+    "CIBR", "BUG"                                                         # Cybersecurity ETFs
+]
 
-tickers = get_sp500_tickers()
-if 'PANW' not in tickers:
-    tickers.append('PANW')
-data = yf.download(tickers, start="2023-01-01", end="2023-12-31")['Adj Close']
+# Function to download stock data
+def download_stock_data(tickers, months_back):
+    end_date = pd.Timestamp.today().strftime('%Y-%m-%d')
+    start_date = (pd.Timestamp.today() - pd.DateOffset(months=months_back)).strftime('%Y-%m-%d')
 
-correlation_matrix = data.corr()
+    print(f"Downloading stock data from {start_date} to {end_date}...")
+    data = yf.download(tickers, start=start_date, end=end_date)['Adj Close']
 
-panw_correlation = correlation_matrix['PANW'].drop('PANW')
-top_companies = panw_correlation.sort_values(ascending=False).head(25)
-top_companies.to_csv('../logs/CORRELATION_top_comovement.csv')
+    return data, start_date, end_date
 
-print(top_companies)
-print("Saved to 'CORRELATION_top_comovement.csv'")
+# Main function
+def main(months_back):
+    for i in range(months_back, months_back + 1):
+        # Ensure PANW and cybersecurity/software tickers are included
+        tickers = cybersec_software_tickers.copy()
+
+        # Download stock data
+        data, start_date, end_date = download_stock_data(tickers, months_back)
+
+        # Calculate correlation matrix
+        correlation_matrix = data.corr()
+
+        # Analyze correlation with PANW
+        panw_correlation = correlation_matrix['PANW'].drop('PANW')
+        top_companies = panw_correlation.sort_values(ascending=False).head(10)
+
+        # Save to CSV
+        output_file = f'../logs/CORRELATION_top_comovement_{i}months.csv'
+        top_companies.to_csv(output_file)
+
+        # Print results
+        print(top_companies)
+        print(f"Saved to '{output_file}' (Data from {start_date} to {end_date})")
+
+# Specify how many months back you want to look
+if __name__ == "__main__":
+    months_back = 12*8
+    main(months_back)

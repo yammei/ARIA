@@ -28,7 +28,7 @@ def get_stock_data(ticker, start_date, end_date):
         stock_data['EMA_26'] = stock_data['Close'].ewm(span=26, adjust=False).mean()
         stock_data['EMA_50'] = stock_data['Close'].ewm(span=50, adjust=False).mean()
         stock_data['EMA_200'] = stock_data['Close'].ewm(span=200, adjust=False).mean()
-        stock_data['Ticker'] = ticker  # Add the Ticker column
+        stock_data['Ticker'] = ticker
 
         # Filter for only the required columns
         stock_data = stock_data[['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'EMA_12', 'EMA_26', 'EMA_50', 'EMA_200', 'Ticker']]
@@ -41,7 +41,7 @@ def get_stock_data(ticker, start_date, end_date):
 
 # Main function to retrieve and save stock data
 def main():
-    timeframes = [3]  # Example: Retrieve data from the last 3 months
+    timeframes = range(1, 7)  # Example: Retrieve data from the last 3 months
     for timeframe in timeframes:
         csv_file = '../logs/CORRELATION_top_comovement.csv'
         tickers = load_tickers_from_csv(csv_file)

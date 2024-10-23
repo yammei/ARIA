@@ -23,7 +23,7 @@ def load_competitor_tickers(csv_file):
         tickers = [ticker for ticker in tickers if ticker != 'PANW']
         return tickers
     except Exception as e:
-        print(f"Error loading tickers from CSV: {e}")
+        # print(f"Error loading tickers from CSV: {e}")
         return []
 
 # Prepare variables
@@ -32,7 +32,7 @@ def prepare_variables(stock_data, business_days, competitors):
     endog = panw_data['Close']
 
     # Exogenous variables: EMA values + competitor close prices
-    exog = panw_data[['EMA_50', 'EMA_200']]
+    exog = panw_data[['EMA_12', 'EMA_26', 'Volume']]
 
     for competitor in competitors:
         competitor_data = stock_data[stock_data['Ticker'] == competitor].reindex(panw_data.index).fillna(0)
@@ -62,7 +62,8 @@ def forecast_model(model_fit, endog_test, exog_test):
     return pd.Series(forecast, index=endog_test.index)
 
 # Evaluate model and append metrics to CSV
-def evaluate_model(actual, forecast, timeframe, metrics_path="../logs/ARIMAX_metrics.csv"):
+def evaluate_model(actual, forecast, i_timeframes, j_timeframes, p, q, metrics_path="../logs/ARIMAX_metrics.csv"):
+    # Create DataFrame to compare actual vs forecast
     comparison_df = pd.DataFrame({
         'Actual': actual,
         'Forecast': forecast
@@ -70,14 +71,17 @@ def evaluate_model(actual, forecast, timeframe, metrics_path="../logs/ARIMAX_met
     comparison_df.dropna(inplace=True)
 
     if not comparison_df.empty:
+        # Calculate metrics
         mae = mean_absolute_error(comparison_df['Actual'], comparison_df['Forecast'])
         rmse = np.sqrt(mean_squared_error(comparison_df['Actual'], comparison_df['Forecast']))
         print(f'MAE: {mae}')
         print(f'RMSE: {rmse}')
 
-        # Create a DataFrame for the metrics with the timeframe
+        # Save metrics to CSV
         metrics_df = pd.DataFrame({
-            'Timeframe (months)': [timeframe],
+            '(p, d, q)': [(p, 1, q)],
+            'Training Timeframe': [i_timeframes],
+            'Comovement Timeframe': [j_timeframes],
             'MAE': [mae],
             'RMSE': [rmse]
         })
@@ -88,9 +92,17 @@ def evaluate_model(actual, forecast, timeframe, metrics_path="../logs/ARIMAX_met
         else:
             metrics_df.to_csv(metrics_path, mode='a', header=False, index=False)
 
-        print(f"MAE and RMSE for timeframe {timeframe} months saved to {metrics_path}")
+        # Select the last 10 days for actual vs forecast comparison
+        recent_comparison_df = comparison_df.tail(10)
+        print("Actual vs Forecast (Last 10 Days):\n", recent_comparison_df)
+
+        # Save the last 10 days to CSV for further analysis
+        recent_comparison_csv_path = f'../logs/ARIMAX_actual_vs_forecast_last_10days_{i_timeframes}mo.csv'
+        recent_comparison_df.to_csv(recent_comparison_csv_path)
+        print(f"Actual vs Forecast for last 10 days saved to {recent_comparison_csv_path}")
 
     return comparison_df
+
 
 # Save model and scaler
 def save_model(model, scaler, feature_names, model_file="sarimax_model.pkl", scaler_file="scaler.pkl", features_file="features.pkl"):
@@ -100,37 +112,50 @@ def save_model(model, scaler, feature_names, model_file="sarimax_model.pkl", sca
     joblib.dump(model, os.path.join(file_path_prefix, model_file))
     joblib.dump(scaler, os.path.join(file_path_prefix, scaler_file))
     joblib.dump(feature_names, os.path.join(file_path_prefix, features_file))
-    print(f"Model saved as {model_file}, scaler saved as {scaler_file}, and feature names saved as {features_file}")
+
 
 # Main workflow
 def main():
+    # i_timeframes = [2, 3, 4, 5, 6]
+    # j_timeframes = [12, 24, 48, 60, 96, 120]
+    # p_range = range(1,6)
+    # q_range = range(1,6)
     forecasting = True
-    timeframes = [3]
-    for timeframe in timeframes:
-        # Load tickers from correlation CSV
-        correlation_csv_path = '../logs/CORRELATION_top_comovement.csv'
-        competitors = load_competitor_tickers(correlation_csv_path)
+    i_timeframes = [4]
+    j_timeframes = [120]
+    p_range = range(3, 4)
+    q_range = range(3, 4)
 
-        # Preprocess training data
-        training_data = f"../training_data/ARIMAX_{timeframe}mo_training_data.csv"          # Specify training data file path
-        stock_data, business_days = load_data(training_data)                                # Load training data
-        endog, exog = prepare_variables(stock_data, business_days, competitors)             # Seperate endogenous and exogenous variables
-        exog_scaled, scaler = normalize_exog(exog)                                          # Normalize training data values
-        split_index = int(len(endog) * 0.8)                                                 # Ratio for training and validation split
-        endog_train, endog_test = endog[:split_index], endog[split_index:]                  # Split training and validation (endogenous)
-        exog_train, exog_test = exog_scaled[:split_index], exog_scaled[split_index:]        # Split training and validation (exogenous)
+    for i in i_timeframes:
+        for j in j_timeframes:
+            for p in p_range:
+                for q in q_range:
+                    correlation_csv_path = f'../logs/CORRELATION_top_comovement_{j}months.csv'
+                    competitors = load_competitor_tickers(correlation_csv_path)
 
-        # Train and save model
-        model_file_path = 'sARIMAX_Short_Term_PANW_Forecast.pkl'                    # Specify model fine path
-        model_fit = train_model(endog_train, exog_train, order=(1, 1, 1))           # Train model
-        feature_names = exog_scaled.columns.tolist()                                # Save feature names
-        save_model(model_fit, scaler, feature_names, model_file=model_file_path)    # Save model
-        print("Feature names used during training:", feature_names)
+                    # Preprocess training data
+                    training_data = f"../training_data/ARIMAX_{i}mo_training_data.csv"  # Specify training data file path
+                    stock_data, business_days = load_data(training_data)                 # Load training data
+                    endog, exog = prepare_variables(stock_data, business_days, competitors)  # Prepare variables
+                    exog_scaled, scaler = normalize_exog(exog)                           # Normalize training data
+                    split_index = int(len(endog) * 0.8)                                  # Split data
+                    endog_train, endog_test = endog[:split_index], endog[split_index:]   # Training and testing split (endog)
+                    exog_train, exog_test = exog_scaled[:split_index], exog_scaled[split_index:]  # Exog split
 
-        # Evaluate model across different training datasets
-        if forecasting:
-            forecast_results_self = forecast_model(model_fit, endog_test, exog_test)
-            _ = evaluate_model(endog_test, forecast_results_self, timeframe, metrics_path='../logs/ARIMAX_metrics')
+                    # Train and save model
+                    model_file_path = 'sARIMAX_Short_Term_PANW_Forecast.pkl'
+                    model_fit = train_model(endog_train, exog_train, order=(p, 1, q))  # Train model
+                    feature_names = exog_scaled.columns.tolist()                      # Save feature names
+                    save_model(model_fit, scaler, feature_names, model_file=model_file_path)
+
+                    # Evaluate the model
+                    if forecasting:
+                        forecast_results_self = forecast_model(model_fit, endog_test, exog_test)
+                        _ = evaluate_model(endog_test, forecast_results_self, i, j, p, q, metrics_path='../logs/ARIMAX_metrics')
+
+                        # Generate a 3-day forecast
+                        forecast_df = generate_forecast(model_fit, exog_scaled, stock_data['Close'], days=5, scaler=scaler)
+                        forecast_df.to_csv(f'../logs/ARIMAX_3day_forecast_{i}mo.csv')
 
 if __name__ == "__main__":
     main()

@@ -1,3 +1,10 @@
+Model Metrics:
+
+```bash
+MAE (%): 1.4106491746705319
+RMSE (%): 1.6691941227145795
+```
+
 Endogenous Variables: Palo Alto Networks (PANW) Closing Price
 Exogenous Variables: S&P500 Companies with highest comovement
 

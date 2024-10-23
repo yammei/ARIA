@@ -1,6 +1,6 @@
 scikit-learn
 statsmodels
-yfinance
+yfinance==0.2.44
 pandas
 joblib
 numpy
