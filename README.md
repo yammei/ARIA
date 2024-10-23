@@ -9,6 +9,7 @@ git remote add origin https://github.com/yammei/statistical-models.git
 git pull origin main
 python3 -m venv .venv
 source .venv/bin/activate
+pip3 install -r requirements.txt
 ```
 
 Running the model
